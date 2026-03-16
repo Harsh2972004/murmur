@@ -3,7 +3,6 @@ import UserModel from "@/model/User.model";
 import bcrypt from "bcryptjs";
 
 import { sendVerificationEmail } from "@/helpers/sendVerificationEmail";
-import { success } from "zod";
 
 export const POST = async (request: Request) => {
   await dbConnect();
@@ -64,6 +63,7 @@ export const POST = async (request: Request) => {
       });
       await newUser.save();
     }
+
     const emailResponse = await sendVerificationEmail(
       email,
       username,
@@ -88,7 +88,7 @@ export const POST = async (request: Request) => {
         message: "User registered successfully. Please verify your email.",
       },
       {
-        status: 500,
+        status: 201,
       },
     );
   } catch (error) {
