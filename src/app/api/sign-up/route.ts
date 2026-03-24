@@ -70,7 +70,7 @@ export const POST = async (request: Request) => {
       verifyCode,
     );
 
-    if (emailResponse.success) {
+    if (!emailResponse.success) {
       return Response.json(
         {
           success: false,
