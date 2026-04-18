@@ -98,31 +98,44 @@ const Navbar = () => {
                   </DrawerClose>
                 </DrawerDescription>
               </DrawerHeader>
-              <div className="flex flex-col justify-center px-6 gap-6">
-                <Button className="rounded-md py-4.5">
-                  <DrawerClose asChild>
-                    <Link
-                      className="font-medium lg:text-lg"
-                      href={"/dashboard"}
-                    >
-                      Dashboard
-                    </Link>
-                  </DrawerClose>
-                </Button>
-                <div className="flex flex-col items-center gap-4 bg-slate-100 dark:bg-card rounded-md py-2 px-3">
-                  <span className="font-semibold text-sm lg:text-base">
-                    Welcome, {user?.username || user?.email}
-                  </span>
-                  <DrawerClose asChild>
+              <div className="mt-8 flex flex-col justify-center px-6 gap-6">
+                {session ? (
+                  <div className="flex flex-col gap-6">
+                    <DrawerClose asChild>
+                      <Button asChild className="rounded-md py-4.5">
+                        <Link
+                          className="font-medium lg:text-lg"
+                          href={"/dashboard"}
+                        >
+                          Dashboard
+                        </Link>
+                      </Button>
+                    </DrawerClose>
+                    <div className="flex flex-col items-center gap-4 bg-slate-100 dark:bg-card rounded-md py-2 px-3">
+                      <span className="font-semibold text-sm lg:text-base">
+                        Welcome, {user?.username || user?.email}
+                      </span>
+                      <DrawerClose asChild>
+                        <Button
+                          onClick={() => signOut()}
+                          className="w-full lg:text-lg md:w-auto rounded-md font-semibold cursor-pointer"
+                          variant={"destructive"}
+                        >
+                          Logout
+                        </Button>
+                      </DrawerClose>
+                    </div>
+                  </div>
+                ) : (
+                  <Link href="/sign-in">
                     <Button
-                      onClick={() => signOut()}
-                      className="w-full lg:text-lg md:w-auto rounded-md font-semibold cursor-pointer"
-                      variant={"destructive"}
+                      className="w-full py-4.5 lg:text-lg md:w-auto font-semibol rounded-md"
+                      variant={"default"}
                     >
-                      Logout
+                      Login
                     </Button>
-                  </DrawerClose>
-                </div>
+                  </Link>
+                )}
               </div>
             </DrawerContent>
           </Drawer>
