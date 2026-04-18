@@ -1,16 +1,32 @@
 import { getServerSession, type User } from "next-auth";
-import { authOptions } from "../auth/[...nextauth]/option";
+import { authOptions } from "../../auth/[...nextauth]/option";
 import dbConnect from "@/lib/dbConnect";
 import UserModel from "@/model/User.model";
-import mongoose from "mongoose";
 
-export const GET = async (request: Request) => {
+export const DELETE = async (
+  request: Request,
+  { params }: { params: Promise<{ messageId: string }> },
+) => {
+  const { messageId } = await params;
+
+  if (!messageId) {
+    return Response.json(
+      {
+        success: false,
+        message: "Message ID is required",
+      },
+      {
+        status: 400,
+      },
+    );
+  }
+
   await dbConnect();
 
   const session = await getServerSession(authOptions);
   const user: User = session?.user as User;
 
-  if (!session || !session.user) {
+  if (!session || !session.user || !user._id) {
     return Response.json(
       {
         success: false,
@@ -22,23 +38,17 @@ export const GET = async (request: Request) => {
     );
   }
 
-  const userId = new mongoose.Types.ObjectId(user._id);
-
   try {
-    const user = await UserModel.aggregate([
-      {
-        $match: { _id: userId },
-      },
-      { $unwind: "$messages" },
-      { $sort: { "messages.createdAt": -1 } },
-      { $group: { _id: "$_id", messages: { $push: "$messages" } } },
-    ]);
+    const updateResult = await UserModel.updateOne(
+      { _id: user._id },
+      { $pull: { messages: { _id: messageId } } },
+    );
 
-    if (!user || user.length === 0) {
+    if (updateResult.modifiedCount == 0) {
       return Response.json(
         {
           success: false,
-          message: "No messages",
+          message: "Message not found or already deleted.",
         },
         {
           status: 404,
@@ -49,18 +59,18 @@ export const GET = async (request: Request) => {
     return Response.json(
       {
         success: true,
-        messages: user[0].messages,
+        message: "message deleted",
       },
       {
         status: 200,
       },
     );
   } catch (error) {
-    console.log("error getting messages", error);
+    console.log("error deleting message", error);
     return Response.json(
       {
         success: false,
-        message: "An unexpected error occurred",
+        message: "error deleting message",
       },
       {
         status: 500,

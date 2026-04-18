@@ -60,7 +60,7 @@ export const GET = async (request: Request) => {
         message: "Username is unique",
       },
       {
-        status: 400,
+        status: 200,
       },
     );
   } catch (error) {

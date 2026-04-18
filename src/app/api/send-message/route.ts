@@ -21,7 +21,7 @@ export const POST = async (request: Request) => {
       );
     }
 
-    if (!user.isAcceptingMessage) {
+    if (!user.isAcceptingMessages) {
       return Response.json(
         {
           success: false,
@@ -47,7 +47,7 @@ export const POST = async (request: Request) => {
     return Response.json(
       {
         success: false,
-        message: "Internal servor error ",
+        message: "Internal server error",
       },
       { status: 500 },
     );

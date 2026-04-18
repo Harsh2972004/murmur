@@ -44,6 +44,8 @@ export const POST = async (request: Request) => {
         existingUserByEmail.password = hashedPassword;
         existingUserByEmail.verifyCode = verifyCode;
         existingUserByEmail.verifyCodeExpiry = new Date(Date.now() + 3600000);
+        existingUserByEmail.resetCode = "";
+        existingUserByEmail.resetCodeExpiry = new Date();
         await existingUserByEmail.save();
       }
     } else {
@@ -57,8 +59,10 @@ export const POST = async (request: Request) => {
         password: hashedPassword,
         verifyCode,
         verifyCodeExpiry: expiryDate,
+        resetCode: "",
+        resetCodeExpiry: new Date(),
         isVerified: false,
-        isAcceptingMessage: true,
+        isAcceptingMessages: true,
         messages: [],
       });
       await newUser.save();
@@ -74,7 +78,7 @@ export const POST = async (request: Request) => {
       return Response.json(
         {
           success: false,
-          messsage: emailResponse.message,
+          message: emailResponse.message,
         },
         {
           status: 500,
