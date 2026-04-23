@@ -13,7 +13,7 @@ const notoSans = Noto_Sans({
 export const metadata: Metadata = {
   title: "Murmur",
   description:
-    "Whispr is an anonymous messaging platform that lets you receive honest, unfiltered messages from anyone. Share your unique link, sit back, and hear what people really think — no names, no filters, just pure honesty.",
+    "Murmur is an anonymous messaging platform that lets you receive honest, unfiltered messages from anyone. Share your unique link, sit back, and hear what people really think — no names, no filters, just pure honesty.",
 };
 
 export default function RootLayout({
