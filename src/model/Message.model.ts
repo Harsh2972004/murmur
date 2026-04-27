@@ -3,7 +3,6 @@ import mongoose, { Types, Schema, Document } from "mongoose";
 export interface MessageType extends Document {
   conversationId: Types.ObjectId;
   senderId: Types.ObjectId;
-  receiverId?: Types.ObjectId;
   content: string;
   isAnonymous: boolean;
   readBy: Types.ObjectId[];
@@ -19,11 +18,6 @@ const messageSchema: Schema<MessageType> = new Schema(
       required: true,
     },
     senderId: {
-      type: Types.ObjectId,
-      ref: "User",
-      default: null,
-    },
-    receiverId: {
       type: Types.ObjectId,
       ref: "User",
       default: null,
@@ -49,5 +43,5 @@ messageSchema.index({ conversationId: 1, createdAt: -1 });
 messageSchema.index({ senderId: 1 });
 
 export const Message =
-  mongoose.models.Message ||
+  (mongoose.models.Message as mongoose.Model<MessageType>) ||
   mongoose.model<MessageType>("Message", messageSchema);

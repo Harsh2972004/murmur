@@ -8,7 +8,7 @@ export interface ConversationType extends Document {
   lastMessage?: string;
   lastMessageAt?: Date;
   expiresAt?: Date;
-  isAccepting?: boolean;
+  isAcceptingMessages?: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -45,7 +45,7 @@ const conversationSchema: Schema<ConversationType> = new Schema(
     expiresAt: {
       type: Date,
     },
-    isAccepting: {
+    isAcceptingMessages: {
       type: Boolean,
       default: true,
     },
@@ -57,5 +57,5 @@ conversationSchema.index({ participants: 1 });
 conversationSchema.index({ lastMessageAt: -1 });
 
 export const Conversation =
-  mongoose.models.Conversation ||
+  (mongoose.models.Conversation as mongoose.Model<ConversationType>) ||
   mongoose.model<ConversationType>("Conversation", conversationSchema);
