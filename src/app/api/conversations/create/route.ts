@@ -57,11 +57,13 @@ export const POST = async (request: Request) => {
       },
     );
   } catch (error) {
-    console.log("Error creating conversation ", error);
+    console.error("Error creating conversation ", error);
+    const message =
+      error instanceof Error ? error.message : "Internal server error";
     return Response.json(
       {
         success: false,
-        message: "Internal server error",
+        message,
       },
       { status: 500 },
     );
