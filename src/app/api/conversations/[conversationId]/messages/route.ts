@@ -1,9 +1,9 @@
 import { authOptions } from "@/app/api/auth/[...nextauth]/option";
 import dbConnect from "@/lib/dbConnect";
 import { Conversation } from "@/model/Conversation.model";
-import { Message } from "@/model/Message.model";
+import { Message, MessageType } from "@/model/Message.model";
 import { messageSchema } from "@/schemas/messageSchema";
-import { Types } from "mongoose";
+import { QueryFilter, Types } from "mongoose";
 import { getServerSession } from "next-auth";
 import * as z from "zod";
 
@@ -122,11 +122,107 @@ export const POST = async (
       { status: 201 },
     );
   } catch (error) {
-    console.log("Error finding conversation ", error);
+    console.error("Error sending message ", error);
+
+    const message =
+      error instanceof Error ? error.message : "Internal server error";
     return Response.json(
       {
         success: false,
-        message: "Internal server error",
+        message,
+      },
+      { status: 500 },
+    );
+  }
+};
+
+// GET /api/conversations/[conversationId]/messages?cursor=<lastMessageId>&limit=20
+export const GET = async (
+  request: Request,
+  { params }: { params: Promise<{ conversationId: string }> },
+) => {
+  await dbConnect();
+  const { conversationId } = await params;
+
+  if (!conversationId) {
+    return Response.json(
+      { success: false, message: "Conversation ID is required" },
+      { status: 400 },
+    );
+  }
+
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return Response.json(
+      { success: false, message: "Unauthorized" },
+      { status: 401 },
+    );
+  }
+
+  const { searchParams } = new URL(request.url);
+  const cursor = searchParams.get("cursor");
+  const limit = 20;
+
+  try {
+    const query: QueryFilter<MessageType> = {
+      conversationId: new Types.ObjectId(conversationId),
+    };
+    const userId = new Types.ObjectId(session.user._id);
+
+    const conversation = await Conversation.findById(conversationId);
+
+    if (!conversation) {
+      return Response.json(
+        {
+          success: false,
+          message: "conversation not found",
+        },
+        { status: 404 },
+      );
+    }
+
+    if (
+      !conversation.participants.some(
+        (id) => id.toString() === userId.toString(),
+      )
+    ) {
+      return Response.json(
+        {
+          success: false,
+          message: "unauthorized",
+        },
+        {
+          status: 403,
+        },
+      );
+    }
+
+    if (cursor) {
+      query._id = { $lt: new Types.ObjectId(cursor) };
+    }
+
+    const messages = await Message.find(query).sort({ _id: -1 }).limit(limit);
+
+    const hasMore = messages.length === limit;
+
+    return Response.json(
+      {
+        success: true,
+        messages: messages.reverse(),
+        hasMore,
+        nextCursor: hasMore ? messages[0]._id : null,
+      },
+      { status: 200 },
+    );
+  } catch (error) {
+    console.error("Error fetching messages ", error);
+
+    const message =
+      error instanceof Error ? error.message : "Internal server error";
+    return Response.json(
+      {
+        success: false,
+        message,
       },
       { status: 500 },
     );
