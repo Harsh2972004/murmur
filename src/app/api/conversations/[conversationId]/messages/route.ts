@@ -228,3 +228,101 @@ export const GET = async (
     );
   }
 };
+
+// DELETE /api/conversations/[conversationId]/messages?messageId=123
+// DELETE /api/conversations/[conversationId]/messages?messageId=123,456,789
+export const DELETE = async (
+  request: Request,
+  { params }: { params: Promise<{ conversationId: string }> },
+) => {
+  await dbConnect();
+
+  const { conversationId } = await params;
+  if (!conversationId) {
+    return Response.json(
+      { success: false, message: "Conversation ID is required" },
+      { status: 400 },
+    );
+  }
+
+  const session = await getServerSession(authOptions);
+  if (!session?.user) {
+    return Response.json(
+      { success: false, message: "Unauthorized" },
+      { status: 401 },
+    );
+  }
+
+  const { searchParams } = new URL(request.url);
+  const messageIds = searchParams.get("messageId")?.split(",") ?? [];
+
+  if (!messageIds.length) {
+    return Response.json(
+      { success: false, message: "No message IDs provided" },
+      { status: 400 },
+    );
+  }
+
+  try {
+    const userId = new Types.ObjectId(session.user._id);
+
+    const conversation = await Conversation.findById(conversationId);
+    if (!conversation) {
+      return Response.json(
+        { success: false, message: "Conversation not found" },
+        { status: 404 },
+      );
+    }
+
+    // check user belongs to this conversation
+    if (
+      !conversation.participants.some(
+        (id) => id.toString() === userId.toString(),
+      )
+    ) {
+      return Response.json(
+        { success: false, message: "Unauthorized" },
+        { status: 403 },
+      );
+    }
+
+    const isAdmin = conversation.adminIds?.some(
+      (id) => id.toString() === userId.toString(),
+    );
+
+    const objectIds = messageIds.map((id) => new Types.ObjectId(id));
+
+    if (isAdmin) {
+      // admins can delete any message in the conversation
+      await Message.deleteMany({
+        _id: { $in: objectIds },
+        conversationId,
+      });
+    } else {
+      // regular users can only delete their own messages
+      await Message.deleteMany({
+        _id: { $in: objectIds },
+        conversationId,
+        senderId: userId,
+      });
+    }
+
+    return Response.json(
+      { success: true, message: "Messages deleted successfully" },
+      { status: 200 },
+    );
+  } catch (error) {
+    console.error("Error deleting messages ", error);
+    const message =
+      error instanceof Error ? error.message : "Internal server error";
+    return Response.json(
+      {
+        success: false,
+        message,
+      },
+      {
+        status: 500,
+      },
+    );
+  }
+};
