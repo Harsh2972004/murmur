@@ -255,8 +255,9 @@ export const DELETE = async (
 
   const { searchParams } = new URL(request.url);
   const messageIds = searchParams.get("messageId")?.split(",") ?? [];
+  const all = searchParams.get("all") === "true";
 
-  if (!messageIds.length) {
+  if (!all && !messageIds.length) {
     return Response.json(
       { success: false, message: "No message IDs provided" },
       { status: 400 },
@@ -292,19 +293,19 @@ export const DELETE = async (
 
     const objectIds = messageIds.map((id) => new Types.ObjectId(id));
 
+    const query = all
+      ? { conversationId }
+      : {
+          _id: { $in: objectIds },
+          conversationId,
+        };
+
     if (isAdmin) {
       // admins can delete any message in the conversation
-      await Message.deleteMany({
-        _id: { $in: objectIds },
-        conversationId,
-      });
+      await Message.deleteMany(query);
     } else {
       // regular users can only delete their own messages
-      await Message.deleteMany({
-        _id: { $in: objectIds },
-        conversationId,
-        senderId: userId,
-      });
+      await Message.deleteMany({ ...query, senderId: userId });
     }
 
     return Response.json(
