@@ -131,5 +131,5 @@
 }
 
 @utility main-content-area {
-  @apply h-screen p-4 md:px-6 rounded-lg bg-sidebar w-full no-scrollbar overflow-auto;
+  @apply h-screen p-4 md:px-6 rounded-lg bg-sidebar w-full;
 }
