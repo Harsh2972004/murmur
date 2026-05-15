@@ -16,19 +16,44 @@ export const GET = async (request: Request) => {
     );
   }
 
-  const userId = new Types.ObjectId(session.user._id);
-
   try {
+    const userId = new Types.ObjectId(session.user._id);
+
+    const lookupField = {
+      $lookup: {
+        from: "users",
+        localField: "participants",
+        foreignField: "_id",
+        as: "participants",
+        pipeline: [{ $project: { _id: 1, username: 1, avatar: 1 } }],
+      },
+    };
+
+    const projectField = {
+      $project: {
+        _id: 1,
+        name: 1,
+        type: 1,
+        lastMessage: 1,
+        lastMessageAt: 1,
+        participants: 1,
+        isAcceptingMessages: 1,
+      },
+    };
     const [chats, anonymousChats] = await Promise.all([
       Conversation.aggregate([
         {
           $match: { participants: userId, type: { $in: ["direct", "group"] } },
         },
         { $sort: { lastMessageAt: -1 } },
+        lookupField,
+        projectField,
       ]),
       Conversation.aggregate([
         { $match: { participants: userId, type: "anonymous" } },
         { $sort: { lastMessageAt: -1 } },
+        lookupField,
+        projectField,
       ]),
     ]);
 
