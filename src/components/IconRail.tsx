@@ -6,21 +6,32 @@ import {
   Home,
   MessageCircle,
   MessageCircleQuestionMark,
-  Plus,
   UserRound,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import dynamic from "next/dynamic";
+import { Dispatch, SetStateAction } from "react";
 
-const IconRail = () => {
+const CreateConversation = dynamic(
+  () => import("@/components/CreateConversation"),
+  { ssr: false },
+);
+
+interface props {
+  activeTab: string;
+  setActiveTab: Dispatch<SetStateAction<string>>;
+}
+
+const IconRail = ({ activeTab, setActiveTab }: props) => {
   const pathname = usePathname();
   return (
     <div className="w-26 h-full flex flex-col items-center justify-between bg-background">
       <Image className="w-18 h-18" src={logo} alt="Murmur-logo" />
       {/* settings at bottom */}
       <div className="flex flex-col items-center gap-y-2">
-        <Link href="/dashboard/home">
+        <Link onClick={() => setActiveTab("home")} href="/dashboard">
           <Button
             className={`rounded-full ${pathname.includes("home") ? "text-foreground" : "text-muted-foreground"}`}
             variant={"outline"}
@@ -29,7 +40,7 @@ const IconRail = () => {
             <Home />
           </Button>
         </Link>
-        <Link href="/dashboard/chat">
+        <Link onClick={() => setActiveTab("chat")} href="/dashboard/chat">
           <Button
             className={`rounded-full ${pathname.includes("chat") ? "text-foreground" : "text-muted-foreground"}`}
             variant={"outline"}
@@ -38,7 +49,10 @@ const IconRail = () => {
             <MessageCircle />
           </Button>
         </Link>
-        <Link href="/dashboard/anonymous">
+        <Link
+          onClick={() => setActiveTab("anonymous")}
+          href="/dashboard/anonymous"
+        >
           <Button
             className={`rounded-full ${pathname.includes("anonymous") ? "text-foreground" : "text-muted-foreground"}`}
             variant={"outline"}
@@ -47,13 +61,7 @@ const IconRail = () => {
             <MessageCircleQuestionMark />
           </Button>
         </Link>
-        <Button
-          className="rounded-full text-muted-foreground"
-          variant={"outline"}
-          size={"icon-lg"}
-        >
-          <Plus />
-        </Button>
+        <CreateConversation />
       </div>
       <div className="flex flex-col items-center gap-y-4">
         <Button className={`rounded-full`} variant={"outline"} size={"icon-lg"}>

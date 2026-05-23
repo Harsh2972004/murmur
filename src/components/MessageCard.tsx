@@ -1,9 +1,7 @@
 import {
   Card,
   CardAction,
-  CardContent,
   CardDescription,
-  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -21,14 +19,14 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "./ui/button";
 import { X } from "lucide-react";
-import { Message } from "@/model/User.model";
 import { ApiResponse } from "@/types/ApiResponse";
 import axios, { AxiosError } from "axios";
 import { toast } from "sonner";
 import { formatDistanceToNow } from "date-fns";
+import { MessageType } from "@/model/Message.model";
 
 type MessageCardProps = {
-  message: Message;
+  message: MessageType;
   onMessageDelete: (messageId: string) => void;
 };
 
@@ -50,7 +48,7 @@ const MessageCard = ({ message, onMessageDelete }: MessageCardProps) => {
     }
   };
   return (
-    <Card>
+    <Card className="min-h-20 max-h-fit">
       <CardHeader>
         <CardTitle className="md:text-xl">{message.content}</CardTitle>
         <CardDescription className="text-xs">
