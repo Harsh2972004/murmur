@@ -11,7 +11,7 @@ export interface UserType extends Document {
   isAcceptingMessages: boolean;
   avatar?: string;
   bio?: string;
-  friends?: Types.ObjectId[];
+  friends: Types.ObjectId[];
   blockedUsers: Types.ObjectId[];
 }
 
@@ -64,6 +64,7 @@ const UserSchema: Schema<UserType> = new Schema(
       {
         type: Types.ObjectId,
         ref: "User",
+        default: [],
       },
     ],
 
