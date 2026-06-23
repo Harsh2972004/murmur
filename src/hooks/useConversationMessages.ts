@@ -72,6 +72,12 @@ export const useConversationMessages = ({
   const [isSwitchLoading, setIsSwitchLoading] = useState(false);
   const [isAccepting, setIsAccepting] = useState(false);
   const [isSending, setIsSending] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Multi-select mode for bulk delete, entered via long-press/right-click
+  // on a message bubble.
+  const [isSelecting, setIsSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const fetchMessages = useCallback(
     async (refresh = false) => {
@@ -184,6 +190,116 @@ export const useConversationMessages = ({
     [conversationId, fetchMessages],
   );
 
+  // Optimistically soft-deletes one or more messages: marks them deleted in
+  // local state immediately (so the placeholder shows with no delay), then
+  // confirms with the server in the background. The server is the source of
+  // truth for *which* ids were actually allowed to be deleted (a non-admin
+  // selecting someone else's message will have that id silently excluded by
+  // the permission check) - so on response, anything NOT in modifiedIds is
+  // rolled back to its original content, even on an overall-success
+  // response. On a hard failure (network/5xx), every affected message is
+  // rolled back.
+  const deleteMessages = useCallback(
+    async (ids: string[], deletedByUserId: string) => {
+      if (!ids.length) return;
+
+      const idSet = new Set(ids);
+      let snapshot: MessageType[] = [];
+
+      setMessages((prev) => {
+        snapshot = prev;
+        return prev.map((message) => {
+          const id = message._id?.toString();
+          if (!id || !idSet.has(id)) return message;
+          return {
+            ...message,
+            isDeleted: true,
+            deletedAt: new Date(),
+            deletedBy: deletedByUserId,
+            content: "",
+          } as MessageType;
+        });
+      });
+
+      const rollbackIds = (idsToRevert: string[]) => {
+        if (!idsToRevert.length) return;
+        const revertSet = new Set(idsToRevert);
+        setMessages((prev) =>
+          prev.map((message) => {
+            const id = message._id?.toString();
+            if (!id || !revertSet.has(id)) return message;
+            const original = snapshot.find((m) => m._id?.toString() === id);
+            return original ?? message;
+          }),
+        );
+      };
+
+      setIsDeleting(true);
+      try {
+        const response = await axios.delete<
+          ApiResponse & { modifiedIds?: string[] }
+        >(
+          `/api/conversations/${conversationId}/messages?messageId=${ids.join(",")}`,
+        );
+
+        const modifiedIds = new Set(response.data.modifiedIds ?? []);
+        const rejectedIds = ids.filter((id) => !modifiedIds.has(id));
+
+        if (rejectedIds.length) {
+          rollbackIds(rejectedIds);
+          toast.error(
+            rejectedIds.length === ids.length
+              ? "You don't have permission to delete that message"
+              : "Some messages couldn't be deleted",
+          );
+        }
+      } catch (error) {
+        // hard failure - roll back everything we optimistically changed
+        rollbackIds(ids);
+        const axiosError = error as AxiosError<ApiResponse>;
+        toast.error(
+          axiosError.response?.data.message || "Failed to delete message",
+        );
+      } finally {
+        setIsDeleting(false);
+      }
+    },
+    [conversationId],
+  );
+
+  const enterSelectionMode = useCallback((initialId?: string) => {
+    setIsSelecting(true);
+    if (initialId) {
+      setSelectedIds(new Set([initialId]));
+    }
+  }, []);
+
+  const exitSelectionMode = useCallback(() => {
+    setIsSelecting(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  const toggleSelected = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }, []);
+
+  const deleteSelectedMessages = useCallback(
+    async (deletedByUserId: string) => {
+      const ids = Array.from(selectedIds);
+      await deleteMessages(ids, deletedByUserId);
+      exitSelectionMode();
+    },
+    [deleteMessages, exitSelectionMode, selectedIds],
+  );
+
   useEffect(() => {
     fetchMessages();
     if (isAnonymous) {
@@ -199,10 +315,18 @@ export const useConversationMessages = ({
     isAccepting,
     isSwitchLoading,
     isSending,
+    isDeleting,
+    isSelecting,
+    selectedIds,
     fetchMoreMessages,
     handleSwitchChange,
     handleDeleteAllMessages,
     sendMessage,
+    deleteMessages,
+    deleteSelectedMessages,
+    enterSelectionMode,
+    exitSelectionMode,
+    toggleSelected,
     formatMessageTime,
     getDateSeparator,
     groupMessagesByDate,

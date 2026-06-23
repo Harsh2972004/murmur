@@ -231,6 +231,12 @@ export const GET = async (
 
 // DELETE /api/conversations/[conversationId]/messages?messageId=123
 // DELETE /api/conversations/[conversationId]/messages?messageId=123,456,789
+// DELETE /api/conversations/[conversationId]/messages?all=true
+//
+// Soft delete: message documents are kept (so cursor pagination and group
+// "X deleted this message" attribution keep working), but content is wiped
+// and isDeleted/deletedAt/deletedBy are set. Nothing is ever removed from
+// the DB by this route - that's intentional, see Message.model.ts.
 export const DELETE = async (
   request: Request,
   { params }: { params: Promise<{ conversationId: string }> },
@@ -294,22 +300,67 @@ export const DELETE = async (
     const objectIds = messageIds.map((id) => new Types.ObjectId(id));
 
     const query = all
-      ? { conversationId }
+      ? { conversationId, isDeleted: { $ne: true } }
       : {
           _id: { $in: objectIds },
           conversationId,
+          isDeleted: { $ne: true },
         };
 
-    if (isAdmin) {
-      // admins can delete any message in the conversation
-      await Message.deleteMany(query);
-    } else {
-      // regular users can only delete their own messages
-      await Message.deleteMany({ ...query, senderId: userId });
+    // regular users may only soft-delete their own messages; admins may
+    // soft-delete any message in the conversation
+    const scopedQuery = isAdmin ? query : { ...query, senderId: userId };
+
+    const softDeleteUpdate = {
+      isDeleted: true,
+      deletedAt: new Date(),
+      deletedBy: userId,
+      content: "",
+    };
+
+    // Capture which ids actually matched the permission-scoped query BEFORE
+    // updating, so we can tell the client exactly what was deleted. This
+    // matters because the client sends an optimistic list of ids it *wants*
+    // deleted, but only ids that pass the senderId/admin check should ever
+    // be confirmed back to it - otherwise the client has no way to know a
+    // message it tried to delete was silently skipped by the permission
+    // check, and may keep showing it as deleted locally until next refetch.
+    const matchedDocs = await Message.find(scopedQuery, { _id: 1 }).lean();
+    const modifiedIds = matchedDocs.map((doc) => doc._id.toString());
+
+    const result = await Message.updateMany(scopedQuery, softDeleteUpdate);
+
+    // If the conversation's lastMessage was one of the messages we just
+    // deleted, the sidebar preview needs to reflect that instead of
+    // showing stale content. Re-derive lastMessage/lastMessageAt from the
+    // most recent message (or clear it if the conversation is now empty).
+    if (result.modifiedCount > 0) {
+      const mostRecent = await Message.findOne({ conversationId })
+        .sort({ createdAt: -1 })
+        .lean();
+
+      if (mostRecent) {
+        await Conversation.findByIdAndUpdate(conversationId, {
+          lastMessage: mostRecent.isDeleted
+            ? "This message was deleted"
+            : mostRecent.content,
+          lastMessageAt: mostRecent.createdAt,
+        });
+      } else {
+        await Conversation.findByIdAndUpdate(conversationId, {
+          lastMessage: "",
+          lastMessageAt: null,
+        });
+      }
     }
 
     return Response.json(
-      { success: true, message: "Messages deleted successfully" },
+      {
+        success: true,
+        message: "Messages deleted successfully",
+        deletedCount: result.modifiedCount,
+        modifiedIds,
+      },
       { status: 200 },
     );
   } catch (error) {

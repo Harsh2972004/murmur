@@ -1,11 +1,11 @@
-import { ConversationType } from "@/model/Conversation.model";
+import { PopulatedConversation } from "@/types/conversation";
 import { create } from "zustand";
 
 interface ConversationStoreType {
-  chats: ConversationType[];
-  anonymousChats: ConversationType[];
-  setChats: (chats: ConversationType[]) => void;
-  setAnonymousChats: (anonymousChats: ConversationType[]) => void;
+  chats: PopulatedConversation[];
+  anonymousChats: PopulatedConversation[];
+  setChats: (chats: PopulatedConversation[]) => void;
+  setAnonymousChats: (anonymousChats: PopulatedConversation[]) => void;
 }
 
 export const useConversationStore = create<ConversationStoreType>((set) => ({

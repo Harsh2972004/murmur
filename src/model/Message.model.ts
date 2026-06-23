@@ -6,6 +6,9 @@ export interface MessageType extends Document {
   content: string;
   isAnonymous: boolean;
   readBy: Types.ObjectId[];
+  isDeleted: boolean;
+  deletedAt: Date | null;
+  deletedBy: Types.ObjectId | string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -33,6 +36,19 @@ const messageSchema: Schema<MessageType> = new Schema(
     readBy: {
       type: [{ type: Types.ObjectId, ref: "User" }],
       default: [],
+    },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
+    deletedBy: {
+      type: Types.ObjectId,
+      ref: "User",
+      default: null,
     },
   },
   { timestamps: true },

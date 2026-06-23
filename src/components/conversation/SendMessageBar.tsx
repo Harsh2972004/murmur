@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Loader2 } from "lucide-react";
 
 type SendMessageBarProps = {
-  onSend: (content: string) => Promise<void>;
+  onSend: (content: string) => void;
   isSending: boolean;
 };
 
