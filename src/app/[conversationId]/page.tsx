@@ -91,9 +91,23 @@ const ConversationSendPage = ({
 
       setSuggestions(parsed);
     } catch (error) {
-      const axiosError = error as AxiosError<ApiResponse>;
-      const errorMessage =
-        axiosError.response?.data?.message ?? "Failed to fetch suggestions";
+      const axiosError = error as AxiosError<any>;
+      let errorMessage = "Failed to fetch suggestions";
+
+      const respData = axiosError.response?.data;
+      if (respData) {
+        if (typeof respData === "string") {
+          try {
+            const parsed = JSON.parse(respData);
+            errorMessage = parsed?.message ?? errorMessage;
+          } catch {
+            // not JSON, keep default
+          }
+        } else if (typeof respData === "object") {
+          errorMessage = respData?.message ?? errorMessage;
+        }
+      }
+
       toast.error("Error", { description: errorMessage });
     } finally {
       setIsFetchingSuggestions(false);

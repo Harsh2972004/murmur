@@ -2,6 +2,7 @@
 import IconRail from "@/components/IconRail";
 import AppSidebar from "@/components/app-sidebar";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { useConversationStore } from "@/store/conversation.store";
 import { ApiResponse } from "@/types/ApiResponse";
 import axios from "axios";
@@ -30,13 +31,15 @@ export default function RootLayout({
 
   return (
     <SidebarProvider>
-      <div
-        className={`relative py-8 px-4 gap-x-2 w-full flex h-screen overflow-hidden`}
-      >
-        <IconRail activeTab={activeTab} setActiveTab={setActiveTab} />
-        <AppSidebar />
-        <SidebarInset className="flex-1">{children}</SidebarInset>
-      </div>
+      <TooltipProvider>
+        <div
+          className={`relative py-8 px-4 gap-x-2 w-full max-w-8xl mx-auto flex h-screen overflow-hidden`}
+        >
+          <IconRail setActiveTab={setActiveTab} />
+          <AppSidebar />
+          <SidebarInset className="flex-1">{children}</SidebarInset>
+        </div>
+      </TooltipProvider>
     </SidebarProvider>
   );
 }
