@@ -30,9 +30,11 @@ export const GET = async (
 
   try {
     const userId = new Types.ObjectId(session.user._id);
-    const conversation = await Conversation.findById(conversationId).select(
-      "type isAcceptingMessages participants name lastMessage lastMessageAt",
-    );
+    const conversation = await Conversation.findById(conversationId)
+      .populate("participants", "_id username avatar")
+      .select(
+        "type isAcceptingMessages participants name lastMessage lastMessageAt",
+      );
 
     if (!conversation) {
       return Response.json(
@@ -42,9 +44,10 @@ export const GET = async (
     }
 
     if (
-      !conversation.participants.some(
-        (id) => id.toString() === userId.toString(),
-      )
+      !conversation.participants.some((p: any) => {
+        const participantId = p?._id ? p._id.toString() : p.toString();
+        return participantId === userId.toString();
+      })
     ) {
       return Response.json(
         { success: false, message: "Unauthorized" },
