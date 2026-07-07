@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-export const addFriendSchema = z.object({
+export const SendFriendRequestSchema = z.object({
   friendName: z
     .string()
     .min(1, "Username is required")
@@ -11,4 +11,9 @@ export const addFriendSchema = z.object({
     ),
 });
 
-export type AddFriendInput = z.infer<typeof addFriendSchema>;
+export const respondToRequestSchema = z.object({
+  requestId: z.string(),
+  action: z.enum(["accepted", "rejected"]),
+});
+
+export type AddFriendInput = z.infer<typeof SendFriendRequestSchema>;

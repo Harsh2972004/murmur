@@ -11,7 +11,10 @@ import { Input } from "../ui/input";
 import { Button } from "../ui/button";
 import { Loader2 } from "lucide-react";
 import { useState } from "react";
-import { AddFriendInput, addFriendSchema } from "@/schemas/friendSchema";
+import {
+  AddFriendInput,
+  SendFriendRequestSchema,
+} from "@/schemas/sendFriendRequestSchema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import axios, { AxiosError } from "axios";
 import { ApiResponse } from "@/types/ApiResponse";
@@ -21,7 +24,7 @@ const AddFriend = () => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const form = useForm<AddFriendInput>({
-    resolver: zodResolver(addFriendSchema),
+    resolver: zodResolver(SendFriendRequestSchema),
     defaultValues: {
       friendName: "",
     },
@@ -31,7 +34,7 @@ const AddFriend = () => {
     setIsSubmitting(true);
     try {
       const response = await axios.post<ApiResponse>(
-        "/api/users/add-friend",
+        "/api/users/friends/request",
         data,
       );
 
