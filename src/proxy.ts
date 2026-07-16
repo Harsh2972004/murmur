@@ -15,8 +15,13 @@ export async function proxy(request: NextRequest) {
       url.pathname.startsWith("/verify"))
     // || url.pathname === "/"
   ) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL("/dashboard/chat", request.url));
   }
+
+  if (token && url.pathname === "/dashboard") {
+    return NextResponse.redirect(new URL("/dashboard/chat", request.url));
+  }
+
   if (!token && url.pathname.startsWith("/dashboard")) {
     return NextResponse.redirect(new URL("/sign-in", request.url));
   }

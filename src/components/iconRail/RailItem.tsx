@@ -14,10 +14,7 @@ const RailItem = ({ reactComponent, setActiveTab, tab }: Props) => {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <Link
-          onClick={() => setActiveTab(tab)}
-          href={`/dashboard${tab === "home" ? "" : "/" + tab}`}
-        >
+        <Link onClick={() => setActiveTab(tab)} href={`/dashboard/${tab}`}>
           <Button
             className={`rounded-full ${pathname.includes(tab) ? "text-foreground" : "text-muted-foreground"}`}
             variant={"outline"}

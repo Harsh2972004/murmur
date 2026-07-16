@@ -26,7 +26,8 @@ export const POST = async (request: Request) => {
     }
 
     const isCodeValid = user.resetCode === code;
-    const isCodeNotExpired = new Date(user.resetCodeExpiry) > new Date();
+    const resetCodeExpiry = user.resetCodeExpiry ?? new Date();
+    const isCodeNotExpired = new Date(resetCodeExpiry) > new Date();
 
     if (isCodeValid && isCodeNotExpired) {
       if (newPassword === confirmPassword) {

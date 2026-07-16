@@ -3,11 +3,11 @@ import Image from "next/image";
 import logo from "../../public/murmur-logo.png";
 import {
   Bolt,
-  Home,
   MessageCircle,
   MessageCircleQuestionMark,
   Plus,
   UserRound,
+  UserSearch,
 } from "lucide-react";
 import { Button } from "./ui/button";
 import { Dispatch, SetStateAction } from "react";
@@ -24,11 +24,6 @@ const IconRail = ({ setActiveTab }: props) => {
       {/* settings at bottom */}
       <div className="flex flex-col items-center gap-y-2">
         <RailItem
-          reactComponent={<Home />}
-          setActiveTab={setActiveTab}
-          tab="home"
-        />
-        <RailItem
           reactComponent={<MessageCircle />}
           setActiveTab={setActiveTab}
           tab="chat"
@@ -38,6 +33,11 @@ const IconRail = ({ setActiveTab }: props) => {
           reactComponent={<MessageCircleQuestionMark />}
           setActiveTab={setActiveTab}
           tab="anonymous"
+        />
+        <RailItem
+          reactComponent={<UserSearch />}
+          setActiveTab={setActiveTab}
+          tab="friends"
         />
         <RailItem
           reactComponent={<Plus />}

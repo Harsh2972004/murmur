@@ -9,7 +9,7 @@ import {
 import { TabsContent } from "../ui/tabs";
 import { Input } from "../ui/input";
 import { Button } from "../ui/button";
-import { Loader2 } from "lucide-react";
+import { Loader2, UserSearch } from "lucide-react";
 import { useState } from "react";
 import {
   AddFriendInput,
@@ -58,9 +58,12 @@ const AddFriend = () => {
 
   return (
     <TabsContent className="w-full space-y-4" value="add-friend">
-      <h1 className="text-lg md:text-xl font-semibold text-center">
-        Add Friend
-      </h1>
+      <div className="flex items-center gap-2 px-0 py-4 border-b shrink-0">
+        <UserSearch />
+        <h1 className="text-lg md:text-xl font-semibold text-center">
+          Add Friend
+        </h1>
+      </div>
       <form onSubmit={form.handleSubmit(onSubmit)} className=" space-y-6">
         <FieldSet>
           <FieldGroup>

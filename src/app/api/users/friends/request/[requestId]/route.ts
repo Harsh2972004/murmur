@@ -1,7 +1,7 @@
 import dbConnect from "@/lib/dbConnect";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../../../auth/[...nextauth]/option";
-import { Types } from "mongoose";
+import mongoose, { Types } from "mongoose";
 import UserModel from "@/model/User.model";
 import { respondToRequestSchema } from "@/schemas/sendFriendRequestSchema";
 import * as z from "zod";
@@ -40,57 +40,62 @@ export const PATCH = async (request: Request) => {
   try {
     const userId = new Types.ObjectId(session.user._id);
 
-    const friendRequest = await FriendRequestModel.findById(requestId);
+    const existing = await FriendRequestModel.findById(requestId);
 
-    if (!friendRequest) {
+    if (!existing) {
       return Response.json(
         { success: false, message: "friend request doesn't exist" },
         { status: 404 },
       );
     }
-    const isReceiver = friendRequest.receiverId.equals(userId);
 
-    if (!isReceiver) {
+    if (!existing.receiverId.equals(userId)) {
       return Response.json(
         { success: false, message: "Cannot accept your own request" },
         { status: 401 },
       );
     }
 
-    if (friendRequest.status !== "pending") {
-      return Response.json(
-        { success: false, message: "This request has already been resolved" },
-        { status: 409 },
+    await mongoose.connection.transaction(async (dbSession) => {
+      const friendRequest = await FriendRequestModel.findOneAndUpdate(
+        { _id: requestId, status: "pending" },
+        { status: action },
+        { session: dbSession, new: false },
       );
-    }
 
-    friendRequest.status = action;
-    await friendRequest.save();
+      if (!friendRequest) {
+        // We already confirmed it exists above, so this means it was
+        // resolved by another request between our check and now
+        throw new Error("ALREADY_RESOLVED");
+      }
 
-    if (action === "accepted") {
-      await UserModel.bulkWrite([
-        {
-          updateOne: {
-            filter: { _id: friendRequest.senderId },
-            update: { $addToSet: { friends: friendRequest.receiverId } },
-          },
-        },
-        {
-          updateOne: {
-            filter: { _id: friendRequest.receiverId },
-            update: { $addToSet: { friends: friendRequest.senderId } },
-          },
-        },
-      ]);
+      if (action === "accepted") {
+        await UserModel.bulkWrite(
+          [
+            {
+              updateOne: {
+                filter: { _id: friendRequest.senderId },
+                update: { $addToSet: { friends: friendRequest.receiverId } },
+              },
+            },
+            {
+              updateOne: {
+                filter: { _id: friendRequest.receiverId },
+                update: { $addToSet: { friends: friendRequest.senderId } },
+              },
+            },
+          ],
+          { session: dbSession },
+        );
+      }
+    });
 
-      return Response.json({
-        success: true,
-        message: "Friend Request accepted",
-      });
-    }
     return Response.json({
       success: true,
-      message: "Friend Request rejected",
+      message:
+        action === "accepted"
+          ? "Friend Request accepted"
+          : "Friend Request rejected",
     });
   } catch (error) {
     console.error("Error creating conversation ", error);

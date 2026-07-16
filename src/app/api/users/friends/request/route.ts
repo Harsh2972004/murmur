@@ -6,6 +6,7 @@ import UserModel from "@/model/User.model";
 import { SendFriendRequestSchema } from "@/schemas/sendFriendRequestSchema";
 import * as z from "zod";
 import FriendRequestModel from "@/model/FriendRequest.model";
+import mongoose from "mongoose";
 
 export const GET = async (request: Request) => {
   await dbConnect();
@@ -200,33 +201,42 @@ export const POST = async (request: Request) => {
       );
 
       if (isReversedRequest) {
-        // auto accepts the request
-        await UserModel.bulkWrite([
-          {
-            updateOne: {
-              filter: { _id: userId },
-              update: { $addToSet: { friends: friend._id } },
-            },
-          },
-          {
-            updateOne: {
-              filter: { _id: friend._id },
-              update: { $addToSet: { friends: userId } },
-            },
-          },
-        ]);
+        await mongoose.connection.transaction(async (dbSession) => {
+          const resolvedRequest = await FriendRequestModel.findOneAndUpdate(
+            { _id: existingFriendRequest._id, status: "pending" },
+            { status: "accepted" },
+            { session: dbSession, new: false },
+          );
 
-        existingFriendRequest.status = "accepted";
-        await existingFriendRequest.save();
+          if (!resolvedRequest) {
+            throw new Error("ALREADY_RESOLVED");
+          }
+
+          await UserModel.bulkWrite(
+            [
+              {
+                updateOne: {
+                  filter: { _id: userId },
+                  update: { $addToSet: { friends: friend._id } },
+                },
+              },
+              {
+                updateOne: {
+                  filter: { _id: friend._id },
+                  update: { $addToSet: { friends: userId } },
+                },
+              },
+            ],
+            { session: dbSession },
+          );
+        });
 
         return Response.json(
           {
             success: true,
             message: "Friend request accepted between both users.",
           },
-          {
-            status: 200,
-          },
+          { status: 200 },
         );
       } else {
         return Response.json(
@@ -246,15 +256,19 @@ export const POST = async (request: Request) => {
       { status: 200 },
     );
   } catch (error) {
+    if (error instanceof Error && error.message === "ALREADY_RESOLVED") {
+      return Response.json(
+        {
+          success: false,
+          message:
+            "This friend request was already resolved — try sending a new request.",
+        },
+        { status: 409 },
+      );
+    }
     console.error("Error creating conversation ", error);
     const message =
       error instanceof Error ? error.message : "Internal server error";
-    return Response.json(
-      {
-        success: false,
-        message,
-      },
-      { status: 500 },
-    );
+    return Response.json({ success: false, message }, { status: 500 });
   }
 };
