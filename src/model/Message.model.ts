@@ -11,6 +11,7 @@ export interface MessageType extends Document {
   deletedBy: Types.ObjectId | string | null;
   createdAt: Date;
   updatedAt: Date;
+  tempId?: string;
 }
 
 const messageSchema: Schema<MessageType> = new Schema(

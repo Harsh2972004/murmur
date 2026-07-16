@@ -2,7 +2,8 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/option";
 import dbConnect from "@/lib/dbConnect";
 import { Conversation } from "@/model/Conversation.model";
 import { Message, MessageType } from "@/model/Message.model";
-import { messageSchema } from "@/schemas/messageSchema";
+import { anonymousMessageSchema, messageSchema } from "@/schemas/messageSchema";
+import { getIO } from "@/socket";
 import { QueryFilter, Types } from "mongoose";
 import { getServerSession } from "next-auth";
 import * as z from "zod";
@@ -27,24 +28,6 @@ export const POST = async (
 
   await dbConnect();
 
-  const parsed = messageSchema.safeParse(await request.json());
-  if (!parsed.success) {
-    const fieldErrors = z.flattenError(parsed.error).fieldErrors;
-    const allErrors = Object.values(fieldErrors).flat();
-    return Response.json(
-      {
-        success: false,
-        message:
-          allErrors?.length > 0
-            ? allErrors?.join(", ")
-            : "Invalid Query parameters",
-      },
-      { status: 400 },
-    );
-  }
-
-  const { content } = parsed.data;
-
   try {
     const conversation = await Conversation.findById(conversationId);
 
@@ -54,6 +37,31 @@ export const POST = async (
         { status: 404 },
       );
     }
+
+    const schema =
+      conversation.type === "anonymous"
+        ? anonymousMessageSchema
+        : messageSchema;
+
+    const parsed = schema.safeParse(await request.json());
+    if (!parsed.success) {
+      const fieldErrors = z.flattenError(parsed.error).fieldErrors;
+      const allErrors = Object.values(fieldErrors).flat();
+      return Response.json(
+        {
+          success: false,
+          message:
+            allErrors?.length > 0
+              ? allErrors?.join(", ")
+              : "Invalid Query parameters",
+        },
+        { status: 400 },
+      );
+    }
+
+    const { content, tempId } = parsed.data;
+
+    let savedMessage;
 
     if (conversation.type === "anonymous") {
       if (conversation.expiresAt && conversation.expiresAt < new Date()) {
@@ -73,7 +81,7 @@ export const POST = async (
         );
       }
 
-      await Message.create({
+      savedMessage = await Message.create({
         conversationId,
         content,
         isAnonymous: true,
@@ -99,7 +107,7 @@ export const POST = async (
         );
       }
 
-      await Message.create({
+      savedMessage = await Message.create({
         conversationId,
         content,
         senderId,
@@ -116,6 +124,10 @@ export const POST = async (
         lastMessageAt: new Date(),
       },
     );
+
+    getIO()
+      .to(conversationId)
+      .emit("new-message", { ...savedMessage.toObject(), tempId });
 
     return Response.json(
       { success: true, message: "Message sent successfully" },

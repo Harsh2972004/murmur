@@ -9,11 +9,15 @@ import ConversationHeader from "@/components/conversation/ConversationHeader";
 import AnonymousConversationControls from "@/components/conversation/AnonymousConversationControls";
 import ConversationMessages from "@/components/conversation/ConversationMessages";
 import SendMessageBar from "@/components/conversation/SendMessageBar";
+import { usePresence } from "@/context/PresenceContext";
 
 // Inner component — can safely call useConversation() since it sits inside
 // the provider.
 const ConversationView = () => {
   const {
+    sessionUserId,
+    typingUsers,
+    getSenderName,
     currentConversation,
     title,
     isAnonymousConversation,
@@ -26,6 +30,8 @@ const ConversationView = () => {
     isSending,
   } = useConversation();
 
+  const { isOnline } = usePresence();
+
   if (!currentConversation) {
     return (
       <div className="flex flex-col h-full items-center justify-center px-6 text-center">
@@ -34,9 +40,20 @@ const ConversationView = () => {
     );
   }
 
+  const otherParticipantId =
+    currentConversation.type === "direct"
+      ? currentConversation.participants.find((p) => p._id !== sessionUserId)
+          ?._id
+      : undefined;
+
   return (
     <div className="flex flex-col h-full main-content-area">
-      <ConversationHeader title={title}>
+      <ConversationHeader
+        title={title}
+        isUserOnline={
+          otherParticipantId ? isOnline(otherParticipantId) : undefined
+        }
+      >
         {isAnonymousConversation && (
           <AnonymousConversationControls
             isAccepting={isAccepting}
@@ -50,8 +67,22 @@ const ConversationView = () => {
 
       <ConversationMessages />
 
+      {typingUsers.size > 0 && (
+        <p className="text-xs text-muted-foreground px-4 pb-1">
+          {Array.from(typingUsers)
+            .map((id) => getSenderName(id))
+            .filter(Boolean)
+            .join(", ")}{" "}
+          typing...
+        </p>
+      )}
+
       {!isAnonymousConversation && (
-        <SendMessageBar onSend={sendMessage} isSending={isSending} />
+        <SendMessageBar
+          conversationId={currentConversation._id.toString()}
+          onSend={sendMessage}
+          isSending={isSending}
+        />
       )}
     </div>
   );

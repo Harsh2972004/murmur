@@ -4,6 +4,7 @@ import { format, isToday, isYesterday } from "date-fns";
 import { toast } from "sonner";
 import { MessageType } from "@/model/Message.model";
 import { ApiResponse } from "@/types/ApiResponse";
+import { socket } from "@/lib/socket";
 
 export type GroupedMessages = {
   date: string;
@@ -57,12 +58,14 @@ type UseConversationMessagesProps = {
   conversationId: string;
   isAnonymous: boolean;
   messagesContainerRef: React.RefObject<HTMLDivElement | null>;
+  sessionUserId: string;
 };
 
 export const useConversationMessages = ({
   conversationId,
   isAnonymous,
   messagesContainerRef,
+  sessionUserId,
 }: UseConversationMessagesProps) => {
   const [messages, setMessages] = useState<MessageType[]>([]);
   const [cursor, setCursor] = useState<string | null>(null);
@@ -171,13 +174,33 @@ export const useConversationMessages = ({
 
   const sendMessage = useCallback(
     async (content: string) => {
-      if (!content.trim()) return;
+      const trimmed = content.trim();
+      if (!trimmed) return;
+
+      const tempId = crypto.randomUUID();
+
+      const optimisticMessage = {
+        _id: tempId,
+        tempId,
+        conversationId,
+        senderId: sessionUserId,
+        content: trimmed,
+        isAnonymous,
+        readBy: [],
+        isDeleted: false,
+        deletedAt: null,
+        deletedBy: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      } as unknown as MessageType;
+
+      setMessages((prev) => [...prev, optimisticMessage]);
       setIsSending(true);
       try {
         await axios.post(`/api/conversations/${conversationId}/messages`, {
           content: content.trim(),
+          tempId,
         });
-        await fetchMessages(true);
       } catch (error) {
         const axiosError = error as AxiosError<ApiResponse>;
         toast.error(
@@ -187,7 +210,7 @@ export const useConversationMessages = ({
         setIsSending(false);
       }
     },
-    [conversationId, fetchMessages],
+    [conversationId, sessionUserId, isAnonymous],
   );
 
   // Optimistically soft-deletes one or more messages: marks them deleted in
@@ -299,6 +322,34 @@ export const useConversationMessages = ({
     },
     [deleteMessages, exitSelectionMode, selectedIds],
   );
+
+  useEffect(() => {
+    const handleNewMessage = (message: MessageType & { tempId?: string }) => {
+      if (message.conversationId?.toString() !== conversationId) return;
+
+      setMessages((prev) => {
+        const existingIndex = prev.findIndex(
+          (m) =>
+            (message.tempId && m.tempId === message.tempId) ||
+            m._id?.toString() === message._id?.toString(),
+        );
+
+        if (existingIndex !== -1) {
+          const updated = [...prev];
+          updated[existingIndex] = message;
+          return updated;
+        }
+
+        return [...prev, message];
+      });
+    };
+
+    socket.on("new-message", handleNewMessage);
+
+    return () => {
+      socket.off("new-message", handleNewMessage);
+    };
+  }, [conversationId]);
 
   useEffect(() => {
     fetchMessages();

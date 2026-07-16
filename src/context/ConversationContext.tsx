@@ -6,6 +6,7 @@ import {
   useRef,
   useEffect,
   type RefObject,
+  useState,
 } from "react";
 import { useParams } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -14,6 +15,7 @@ import { useConversationMessages } from "@/hooks/useConversationMessages";
 import { useConversationDisplayName } from "@/hooks/useConversationDisplayName";
 import { PopulatedConversation } from "@/types/conversation";
 import { toast } from "sonner";
+import { socket } from "@/lib/socket";
 
 // Everything a child component in the conversation tree might need.
 // Grouped into logical buckets so it's clear what comes from where.
@@ -23,6 +25,7 @@ type ConversationContextValue = {
   isAdmin: boolean;
   currentConversation: PopulatedConversation | undefined;
   title: string;
+  typingUsers: Set<string>;
 
   // refs passed to ConversationMessages for scroll behaviour
   messagesContainerRef: RefObject<HTMLDivElement | null>;
@@ -94,6 +97,8 @@ export const ConversationProvider = ({
     (chat) => chat._id.toString() === conversationId,
   );
 
+  const [typingUsers, setTypingUsers] = useState<Set<string>>(new Set());
+
   const isAnonymousConversation = currentConversation?.type === "anonymous";
 
   const isAdmin = Boolean(
@@ -129,6 +134,7 @@ export const ConversationProvider = ({
     conversationId,
     isAnonymous: Boolean(isAnonymousConversation),
     messagesContainerRef,
+    sessionUserId,
   });
 
   // Scroll to bottom on initial load
@@ -137,6 +143,57 @@ export const ConversationProvider = ({
       messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }
   }, [isLoading, messages.length]);
+
+  useEffect(() => {
+    if (!currentConversation?._id) return;
+
+    const conversationId = currentConversation._id.toString();
+    socket.emit("join-conversation", conversationId);
+
+    return () => {
+      socket.emit("leave-conversation", conversationId);
+    };
+  }, [currentConversation?._id]);
+
+  useEffect(() => {
+    const currentId = currentConversation?._id?.toString();
+    if (!currentId) return;
+
+    const handleUserTyping = ({
+      userId,
+      conversationId: cId,
+    }: {
+      userId: string;
+      conversationId: string;
+    }) => {
+      if (cId !== currentId) return;
+      setTypingUsers((prev) => new Set(prev).add(userId));
+    };
+
+    const handleUserStoppedTyping = ({
+      userId,
+      conversationId: cId,
+    }: {
+      userId: string;
+      conversationId: string;
+    }) => {
+      if (cId !== currentId) return;
+      setTypingUsers((prev) => {
+        const next = new Set(prev);
+        next.delete(userId);
+        return next;
+      });
+    };
+
+    socket.on("user-typing", handleUserTyping);
+    socket.on("user-stopped-typing", handleUserStoppedTyping);
+
+    return () => {
+      socket.off("user-typing", handleUserTyping);
+      socket.off("user-stopped-typing", handleUserStoppedTyping);
+      setTypingUsers(new Set()); // clear stale state when switching conversations
+    };
+  }, [currentConversation?._id]);
 
   const handleScroll = () => {
     const container = messagesContainerRef.current;
@@ -179,6 +236,7 @@ export const ConversationProvider = ({
   return (
     <ConversationContext.Provider
       value={{
+        typingUsers,
         sessionUserId,
         isAdmin,
         currentConversation,
