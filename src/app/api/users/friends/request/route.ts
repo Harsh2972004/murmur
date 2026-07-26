@@ -7,6 +7,7 @@ import { SendFriendRequestSchema } from "@/schemas/sendFriendRequestSchema";
 import * as z from "zod";
 import FriendRequestModel from "@/model/FriendRequest.model";
 import mongoose from "mongoose";
+import { getIO } from "@/socket";
 
 export const GET = async (request: Request) => {
   await dbConnect();
@@ -79,11 +80,17 @@ export const GET = async (request: Request) => {
     const friendRequests =
       await FriendRequestModel.aggregate(friendRequestQuery);
 
+    const pendingCount = friendRequests.filter(
+      (r) => r.type === "incoming",
+    ).length;
+
     if (friendRequests.length === 0) {
       return Response.json(
         {
           success: true,
           message: "No friend Requests found.",
+          friendRequests,
+          pendingCount,
         },
         {
           status: 200,
@@ -96,6 +103,7 @@ export const GET = async (request: Request) => {
         success: true,
         message: "Friend requests fetched successfully.",
         friendRequests,
+        pendingCount,
       },
       { status: 200 },
     );
@@ -231,6 +239,10 @@ export const POST = async (request: Request) => {
           );
         });
 
+        getIO()
+          .to(existingFriendRequest.receiverId.toString())
+          .emit("friend-request-resolved", {});
+
         return Response.json(
           {
             success: true,
@@ -250,6 +262,8 @@ export const POST = async (request: Request) => {
       senderId: userId,
       receiverId: friend._id,
     });
+
+    getIO().to(friend._id.toString()).emit("friend-request-received", {});
 
     return Response.json(
       { success: true, message: "Friend request sent successfully" },

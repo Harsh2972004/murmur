@@ -6,6 +6,7 @@ import UserModel from "@/model/User.model";
 import { respondToRequestSchema } from "@/schemas/sendFriendRequestSchema";
 import * as z from "zod";
 import FriendRequestModel from "@/model/FriendRequest.model";
+import { getIO } from "@/socket";
 
 export const PATCH = async (request: Request) => {
   await dbConnect();
@@ -87,6 +88,10 @@ export const PATCH = async (request: Request) => {
           ],
           { session: dbSession },
         );
+
+        getIO()
+          .to(friendRequest.receiverId.toString())
+          .emit("friend-request-resolved", {});
       }
     });
 

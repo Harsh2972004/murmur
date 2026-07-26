@@ -6,6 +6,7 @@ import * as z from "zod";
 import { Types } from "mongoose";
 import { directChatSchema } from "@/schemas/conversationSchema";
 import UserModel from "@/model/User.model";
+import { getIO } from "@/socket";
 
 export const POST = async (request: Request) => {
   await dbConnect();
@@ -79,6 +80,18 @@ export const POST = async (request: Request) => {
     const directConversation = await Conversation.create({
       type: "direct",
       participants: [userId, recipient._id],
+    });
+
+    const populatedConversation = await Conversation.findById(
+      directConversation._id,
+    )
+      .populate("participants", "_id username avatar")
+      .lean();
+
+    populatedConversation!.participants.forEach((participant: any) => {
+      getIO()
+        .to(participant._id.toString())
+        .emit("conversation-created", populatedConversation);
     });
 
     return Response.json(

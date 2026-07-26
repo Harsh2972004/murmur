@@ -10,4 +10,5 @@ export interface ApiResponse {
   };
   hasMore?: boolean;
   nextCursor?: string;
+  pendingCount?: number;
 }

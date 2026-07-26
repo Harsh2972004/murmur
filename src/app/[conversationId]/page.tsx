@@ -3,7 +3,7 @@
 import React, { use, useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import * as z from "zod";
-import { messageSchema } from "@/schemas/messageSchema";
+import { anonymousMessageSchema } from "@/schemas/messageSchema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
   Field,
@@ -32,8 +32,8 @@ const ConversationSendPage = ({
   const [validationError, setValidationError] = useState<string | null>(null);
   const [isAllowed, setIsAllowed] = useState<boolean>(false);
 
-  const form = useForm<z.infer<typeof messageSchema>>({
-    resolver: zodResolver(messageSchema),
+  const form = useForm<z.infer<typeof anonymousMessageSchema>>({
+    resolver: zodResolver(anonymousMessageSchema),
     mode: "onChange",
     defaultValues: {
       content: "",
@@ -91,7 +91,7 @@ const ConversationSendPage = ({
 
       setSuggestions(parsed);
     } catch (error) {
-      const axiosError = error as AxiosError<any>;
+      const axiosError = error as AxiosError<{ message?: string }>;
       let errorMessage = "Failed to fetch suggestions";
 
       const respData = axiosError.response?.data;
@@ -114,7 +114,7 @@ const ConversationSendPage = ({
     }
   };
 
-  const onSubmit = async (data: z.infer<typeof messageSchema>) => {
+  const onSubmit = async (data: z.infer<typeof anonymousMessageSchema>) => {
     setIsSending(true);
 
     try {

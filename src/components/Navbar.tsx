@@ -23,8 +23,8 @@ const Navbar = () => {
   const user: User = session?.user as User;
 
   return (
-    <nav className="p-4 md:p-6 shadow-md">
-      <div className="md:container mx-auto flex justify-between items-center">
+    <nav className=" p-4 md:p-6 shadow-md">
+      <div className="md:max-w-7xl  mx-auto flex justify-between items-center">
         <Link href="/" className="text-xl font-bold flex items-center">
           <Image
             className="w-14 h-14 lg:w-24 lg:h-24"
@@ -37,7 +37,10 @@ const Navbar = () => {
           {session ? (
             <div className="flex items-center gap-6">
               <Button className="rounded-md py-4.5">
-                <Link className="font-medium lg:text-lg" href={"/dashboard"}>
+                <Link
+                  className="font-medium lg:text-lg"
+                  href={"/dashboard/chat"}
+                >
                   Dashboard
                 </Link>
               </Button>

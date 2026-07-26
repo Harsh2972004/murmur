@@ -1,7 +1,7 @@
 import dbConnect from "@/lib/dbConnect";
 import { getServerSession } from "next-auth";
 import { authOptions } from "../../auth/[...nextauth]/option";
-import mongoose, { Types } from "mongoose";
+import { Types } from "mongoose";
 import UserModel from "@/model/User.model";
 
 export const GET = async (request: Request) => {

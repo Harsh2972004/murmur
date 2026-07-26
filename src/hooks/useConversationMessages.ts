@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import axios, { AxiosError } from "axios";
 import { format, isToday, isYesterday } from "date-fns";
 import { toast } from "sonner";
 import { MessageType } from "@/model/Message.model";
 import { ApiResponse } from "@/types/ApiResponse";
 import { socket } from "@/lib/socket";
+import { Types } from "mongoose";
 
 export type GroupedMessages = {
   date: string;
@@ -77,6 +78,9 @@ export const useConversationMessages = ({
   const [isSending, setIsSending] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  const [unreadBoundaryId, setUnreadBoundaryId] = useState<string | null>(null);
+  const boundaryComputedForRef = useRef<string | null>(null);
+
   // Multi-select mode for bulk delete, entered via long-press/right-click
   // on a message bubble.
   const [isSelecting, setIsSelecting] = useState(false);
@@ -89,9 +93,24 @@ export const useConversationMessages = ({
         const response = await axios.get<ApiResponse>(
           `/api/conversations/${conversationId}/messages?limit=20`,
         );
+
+        const fetched: MessageType[] = response.data.messages || [];
         setMessages(response.data.messages || []);
         setHasMore(response.data.hasMore || false);
         setCursor(response.data.nextCursor || null);
+
+        if (boundaryComputedForRef.current !== conversationId) {
+          const firstUnread = fetched.find(
+            (m) =>
+              m.senderId?.toString() !== sessionUserId &&
+              !(m.readBy ?? [])
+                .map((id) => id.toString())
+                .includes(sessionUserId),
+          );
+          setUnreadBoundaryId(firstUnread ? firstUnread._id.toString() : null);
+          boundaryComputedForRef.current = conversationId;
+        }
+
         if (refresh) toast.success("Messages refreshed");
       } catch (error) {
         const axiosError = error as AxiosError<ApiResponse>;
@@ -176,6 +195,8 @@ export const useConversationMessages = ({
     async (content: string) => {
       const trimmed = content.trim();
       if (!trimmed) return;
+
+      setUnreadBoundaryId(null);
 
       const tempId = crypto.randomUUID();
 
@@ -342,12 +363,54 @@ export const useConversationMessages = ({
 
         return [...prev, message];
       });
+
+      // if this new message is from someone else, and I'm actively viewing
+      // this conversation right now, mark it read immediately
+      if (message.senderId?.toString() !== sessionUserId) {
+        axios
+          .patch(`/api/conversations/${conversationId}/read`)
+          .catch(() => {});
+      }
     };
 
     socket.on("new-message", handleNewMessage);
 
     return () => {
       socket.off("new-message", handleNewMessage);
+    };
+  }, [conversationId, sessionUserId]);
+
+  useEffect(() => {
+    const handleMessagesRead = ({
+      conversationId: cId,
+      userId,
+    }: {
+      conversationId: string;
+      userId: string;
+    }) => {
+      console.log("messages-read received:", {
+        cId,
+        userId,
+        currentConversationId: conversationId,
+      });
+      if (cId !== conversationId) return;
+
+      setMessages((prev) =>
+        prev.map((message) => {
+          const readByIds = message.readBy?.map((id) => id.toString()) ?? [];
+          if (readByIds.includes(userId)) return message;
+          return {
+            ...message,
+            readBy: [...message.readBy, userId as unknown as Types.ObjectId],
+          } as MessageType;
+        }),
+      );
+    };
+
+    socket.on("messages-read", handleMessagesRead);
+
+    return () => {
+      socket.off("messages-read", handleMessagesRead);
     };
   }, [conversationId]);
 
@@ -369,6 +432,7 @@ export const useConversationMessages = ({
     isDeleting,
     isSelecting,
     selectedIds,
+    unreadBoundaryId,
     fetchMoreMessages,
     handleSwitchChange,
     handleDeleteAllMessages,

@@ -29,6 +29,35 @@ export const GET = async (request: Request) => {
       },
     };
 
+    const unreadCountLookup = {
+      $lookup: {
+        from: "messages",
+        let: { convId: "$_id" },
+        pipeline: [
+          {
+            $match: {
+              $expr: { $eq: ["$conversationId", "$$convId"] },
+              senderId: { $ne: userId },
+              readBy: { $ne: userId },
+              isDeleted: false,
+            },
+          },
+          {
+            $count: "count",
+          },
+        ],
+        as: "unreadInfo",
+      },
+    };
+
+    const addUnreadCountField = {
+      $addFields: {
+        unreadCount: {
+          $ifNull: [{ $arrayElemAt: ["$unreadInfo.count", 0] }, 0],
+        },
+      },
+    };
+
     const projectField = {
       $project: {
         _id: 1,
@@ -38,6 +67,7 @@ export const GET = async (request: Request) => {
         lastMessageAt: 1,
         participants: 1,
         isAcceptingMessages: 1,
+        unreadCount: 1,
       },
     };
     const [chats, anonymousChats] = await Promise.all([
@@ -46,12 +76,16 @@ export const GET = async (request: Request) => {
           $match: { participants: userId, type: { $in: ["direct", "group"] } },
         },
         { $sort: { lastMessageAt: -1 } },
+        unreadCountLookup,
+        addUnreadCountField,
         lookupField,
         projectField,
       ]),
       Conversation.aggregate([
         { $match: { participants: userId, type: "anonymous" } },
         { $sort: { lastMessageAt: -1 } },
+        unreadCountLookup,
+        addUnreadCountField,
         lookupField,
         projectField,
       ]),

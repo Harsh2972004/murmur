@@ -6,6 +6,7 @@ import * as z from "zod";
 import { Types } from "mongoose";
 import { groupChatSchema } from "@/schemas/conversationSchema";
 import UserModel from "@/model/User.model";
+import { getIO } from "@/socket";
 
 export const POST = async (request: Request) => {
   await dbConnect();
@@ -58,6 +59,16 @@ export const POST = async (request: Request) => {
       name: groupName,
       participants: [...users, userId],
       adminIds: [userId],
+    });
+
+    const populatedConversation = await Conversation.findById(conversation._id)
+      .populate("participants", "_id username avatar")
+      .lean();
+
+    populatedConversation!.participants.forEach((participant: any) => {
+      getIO()
+        .to(participant._id.toString())
+        .emit("conversation-created", populatedConversation);
     });
 
     return Response.json(

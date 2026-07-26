@@ -16,6 +16,7 @@ import { useConversationDisplayName } from "@/hooks/useConversationDisplayName";
 import { PopulatedConversation } from "@/types/conversation";
 import { toast } from "sonner";
 import { socket } from "@/lib/socket";
+import axios from "axios";
 
 // Everything a child component in the conversation tree might need.
 // Grouped into logical buckets so it's clear what comes from where.
@@ -26,6 +27,7 @@ type ConversationContextValue = {
   currentConversation: PopulatedConversation | undefined;
   title: string;
   typingUsers: Set<string>;
+  otherParticipantId: string | undefined;
 
   // refs passed to ConversationMessages for scroll behaviour
   messagesContainerRef: RefObject<HTMLDivElement | null>;
@@ -33,6 +35,8 @@ type ConversationContextValue = {
 
   // sender name lookup — keyed by userId string
   getSenderName: (senderId: string | undefined) => string | undefined;
+
+  unreadBoundaryId: string | null;
 
   // anonymous controls
   isAnonymousConversation: boolean;
@@ -107,8 +111,19 @@ export const ConversationProvider = ({
     ),
   );
 
+  const otherParticipantId =
+    currentConversation?.type === "direct"
+      ? currentConversation.participants.find((p) => p._id !== sessionUserId)
+          ?._id
+      : undefined;
+
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const { setActiveConversationId } = useConversationStore();
+  const resetUnreadCount = useConversationStore(
+    (state) => state.resetUnreadCount,
+  );
 
   const {
     messages,
@@ -130,6 +145,7 @@ export const ConversationProvider = ({
     enterSelectionMode,
     exitSelectionMode,
     toggleSelected,
+    unreadBoundaryId,
   } = useConversationMessages({
     conversationId,
     isAnonymous: Boolean(isAnonymousConversation),
@@ -149,11 +165,19 @@ export const ConversationProvider = ({
 
     const conversationId = currentConversation._id.toString();
     socket.emit("join-conversation", conversationId);
+    setActiveConversationId(conversationId);
+
+    // mark messages as read now that the user is viewing this conversation
+    axios.patch(`/api/conversations/${conversationId}/read`).catch(() => {
+      // non-critical — a failed read-marking shouldn't disrupt the UI,
+      // so we swallow the error rather than toast it
+    });
 
     return () => {
       socket.emit("leave-conversation", conversationId);
+      setActiveConversationId(null);
     };
-  }, [currentConversation?._id]);
+  }, [currentConversation?._id, setActiveConversationId]);
 
   useEffect(() => {
     const currentId = currentConversation?._id?.toString();
@@ -194,6 +218,20 @@ export const ConversationProvider = ({
       setTypingUsers(new Set()); // clear stale state when switching conversations
     };
   }, [currentConversation?._id]);
+
+  useEffect(() => {
+    if (!currentConversation?._id) return;
+
+    const conversationId = currentConversation._id.toString();
+    socket.emit("join-conversation", conversationId);
+
+    axios.patch(`/api/conversations/${conversationId}/read`).catch(() => {});
+    resetUnreadCount(conversationId); // ← add this line
+
+    return () => {
+      socket.emit("leave-conversation", conversationId);
+    };
+  }, [currentConversation?._id, resetUnreadCount]);
 
   const handleScroll = () => {
     const container = messagesContainerRef.current;
@@ -259,6 +297,7 @@ export const ConversationProvider = ({
         sendMessage,
         isSending,
         deleteMessages,
+        unreadBoundaryId,
         deleteSelectedMessages,
         isDeleting,
         isSelecting,
@@ -266,6 +305,7 @@ export const ConversationProvider = ({
         enterSelectionMode,
         exitSelectionMode,
         toggleSelected,
+        otherParticipantId,
       }}
     >
       {children}

@@ -9,4 +9,5 @@ export type PopulatedParticipant = {
 
 export type PopulatedConversation = Omit<ConversationType, "participants"> & {
   participants: PopulatedParticipant[];
+  unreadCount: number;
 };

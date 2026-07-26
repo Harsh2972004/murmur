@@ -129,6 +129,12 @@ export const POST = async (
       .to(conversationId)
       .emit("new-message", { ...savedMessage.toObject(), tempId });
 
+    conversation.participants.forEach((participantId) => {
+      getIO()
+        .to(participantId.toString())
+        .emit("new-message", { ...savedMessage.toObject(), tempId });
+    });
+
     return Response.json(
       { success: true, message: "Message sent successfully" },
       { status: 201 },

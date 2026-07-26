@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Trash2, MoreVertical } from "lucide-react";
+import { Trash2, MoreVertical, CheckCheckIcon } from "lucide-react";
 import { MessageType } from "@/model/Message.model";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -35,12 +35,17 @@ const ConversationMessageBubble = ({
     enterSelectionMode,
     toggleSelected,
     deleteMessages,
+    otherParticipantId,
   } = useConversation();
 
   const messageId = message._id?.toString() ?? "";
   const isSelected = selectedIds.has(messageId);
   const longPressTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [isHovered, setIsHovered] = useState(false);
+
+  const isSeenByOther =
+    otherParticipantId &&
+    message.readBy?.map((id) => id.toString()).includes(otherParticipantId);
 
   const clearLongPressTimer = () => {
     if (longPressTimer.current) {
@@ -129,13 +134,19 @@ const ConversationMessageBubble = ({
       >
         <p className="text-sm">{message.content}</p>
         <p
-          className={`text-xs mt-1 ${
+          className={`text-xs mt-1 flex items-center gap-2 ${
             isOwn
               ? "text-primary-foreground/60 text-right"
               : "text-muted-foreground"
           }`}
         >
           {formattedTime}
+          {isOwn && (
+            <CheckCheckIcon
+              className={`${isSeenByOther && "text-blue-600"}`}
+              size={14}
+            />
+          )}
         </p>
       </div>
 

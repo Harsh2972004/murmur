@@ -24,6 +24,7 @@ const ConversationMessages = () => {
     messagesContainerRef,
     messagesEndRef,
     handleScroll,
+    unreadBoundaryId,
   } = useConversation();
 
   const groupedMessages = groupMessagesByDate(messages);
@@ -87,17 +88,29 @@ const ConversationMessages = () => {
                 const isOwn = message.senderId?.toString() === sessionUserId;
                 const messageId = message._id?.toString() ?? "";
                 const canDelete = isOwn || isAdmin;
+                const isUnreadBoundary =
+                  unreadBoundaryId !== null && messageId === unreadBoundaryId;
 
                 return (
-                  <ConversationMessageBubble
-                    key={messageId || index}
-                    message={message}
-                    isOwn={isOwn}
-                    canDelete={canDelete}
-                    formattedTime={formatMessageTime(
-                      new Date(message.createdAt),
+                  <div key={messageId || index}>
+                    {isUnreadBoundary && (
+                      <div className="flex items-center gap-2 my-4">
+                        <div className="flex-1 h-px bg-red-300" />
+                        <span className="text-xs font-medium text-red-500">
+                          New Messages
+                        </span>
+                        <div className="flex-1 h-px bg-red-300" />
+                      </div>
                     )}
-                  />
+                    <ConversationMessageBubble
+                      message={message}
+                      isOwn={isOwn}
+                      canDelete={canDelete}
+                      formattedTime={formatMessageTime(
+                        new Date(message.createdAt),
+                      )}
+                    />
+                  </div>
                 );
               })}
             </div>

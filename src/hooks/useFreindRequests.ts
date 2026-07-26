@@ -1,7 +1,9 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import axios, { AxiosError } from "axios";
 import { toast } from "sonner";
 import { ProjectedFriendRequestType } from "@/types/FriendRequest";
+import { useFriendRequestStore } from "@/store/friendRequest.store";
+import { socket } from "@/lib/socket";
 
 export const useFriendRequests = () => {
   const [friendRequests, setFriendRequests] = useState<
@@ -9,6 +11,12 @@ export const useFriendRequests = () => {
   >([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isResponding, setIsResponding] = useState<string | null>(null);
+  const setPendingCount = useFriendRequestStore(
+    (state) => state.setPendingCount,
+  );
+  const decrementPendingCount = useFriendRequestStore(
+    (state) => state.decrementPendingCount,
+  );
 
   const fetchFriendRequests = useCallback(async () => {
     setIsLoading(true);
@@ -17,8 +25,10 @@ export const useFriendRequests = () => {
         success: boolean;
         friendRequests: ProjectedFriendRequestType[];
         message: string;
+        pendingCount: number;
       }>("/api/users/friends/request");
       setFriendRequests(response.data.friendRequests ?? []);
+      setPendingCount(response.data.pendingCount ?? 0);
     } catch (error) {
       const axiosError = error as AxiosError<{ message: string }>;
       toast.error(
@@ -38,6 +48,7 @@ export const useFriendRequests = () => {
       setFriendRequests((prev) =>
         prev.filter((r) => r._id.toString() !== requestId),
       );
+      decrementPendingCount();
       setIsResponding(requestId);
 
       try {
@@ -60,8 +71,22 @@ export const useFriendRequests = () => {
         setIsResponding(null);
       }
     },
-    [friendRequests],
+    [friendRequests, decrementPendingCount],
   );
+
+  useEffect(() => {
+    const handleUpdate = () => {
+      fetchFriendRequests();
+    };
+
+    socket.on("friend-request-received", handleUpdate);
+    socket.on("friend-request-resolved", handleUpdate);
+
+    return () => {
+      socket.off("friend-request-received", handleUpdate);
+      socket.off("friend-request-resolved", handleUpdate);
+    };
+  }, [fetchFriendRequests]);
 
   return {
     friendRequests,
